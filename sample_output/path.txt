@@ -1,0 +1,17 @@
+Optimized Path: 1 -> 8 -> 9 -> 11 -> 2 -> 10 -> 4 -> 5 -> 6 -> 7 -> 12 -> 3 -> 1
+Total Fuel Cost: 48.23 units
+
+Detailed Waypoint Information:
+Waypoint 1: (6.39, 0.25, 2.75)
+Waypoint 8: (6.98, 3.40, 1.55)
+Waypoint 9: (9.57, 3.37, 0.93)
+Waypoint 11: (8.07, 7.30, 5.36)
+Waypoint 2: (2.23, 7.36, 6.77)
+Waypoint 10: (0.97, 8.47, 6.04)
+Waypoint 4: (0.30, 2.19, 5.05)
+Waypoint 5: (0.27, 1.99, 6.50)
+Waypoint 6: (5.45, 2.20, 5.89)
+Waypoint 7: (8.09, 0.06, 8.06)
+Waypoint 12: (9.73, 3.79, 5.52)
+Waypoint 3: (8.92, 0.87, 4.22)
+Waypoint 1: (6.39, 0.25, 2.75)

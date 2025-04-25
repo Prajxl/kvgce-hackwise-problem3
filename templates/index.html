@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waypoint Optimizer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        }
+        .card {
+            backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        #flowVisualization {
+            width: 100%;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            overflow: auto;
+        }
+        .waypoint-node {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #3b82f6;
+            color: white;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+        .start-node {
+            background-color: #10b981;
+        }
+        .end-node {
+            background-color: #f43f5e;
+        }
+        .arrow {
+            display: inline-block;
+            color: #64748b;
+            font-size: 24px;
+            margin: 0 5px;
+        }
+        .flow-container {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .waypoint-info {
+            font-size: 12px;
+            text-align: center;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen gradient-bg text-gray-800 p-4">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-white mb-2">Waypoint Optimizer</h1>
+            <p class="text-blue-100">Find the optimal path through 3D space</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="card rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">Input Waypoints</h2>
+                <p class="text-sm text-gray-600 mb-4">
+                    Enter waypoints in format: <code class="bg-gray-100 px-1 rounded">ID X Y Z</code><br>
+                    Example: <code class="bg-gray-100 px-1 rounded">A 0.0 0.0 0.0</code>
+                </p>
+                
+                <div class="mb-4">
+                    <textarea 
+                        id="waypointsInput" 
+                        class="w-full h-64 p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                        placeholder="A 0.0 0.0 0.0
+B 1.0 2.0 3.0
+C 4.5 2.1 1.0
+D 3.2 5.6 2.1"
+                    ></textarea>
+                </div>
+                
+                <div class="flex justify-between items-center">
+                    <button 
+                        id="generateSample" 
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-gray-400"
+                    >
+                        Generate Sample
+                    </button>
+                    
+                    <button 
+                        id="optimizeBtn" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        Optimize Path
+                    </button>
+                </div>
+                
+                <div id="errorMessage" class="mt-4 text-red-600 hidden"></div>
+            </div>
+            
+            <div class="card rounded-lg shadow-lg p-6">
+                <h2 class="text-2xl font-semibold mb-4">Results</h2>
+                
+                <div id="loadingIndicator" class="hidden">
+                    <div class="flex justify-center items-center py-8">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+                
+                <div id="resultContainer" class="hidden">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-medium mb-2">Optimized Path:</h3>
+                        <div id="pathDisplay" class="bg-blue-50 p-3 rounded text-lg font-medium"></div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-2">Total Fuel Cost:</h3>
+                        <div id="costDisplay" class="bg-blue-50 p-3 rounded text-lg font-medium"></div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-medium mb-2">Path Visualization:</h3>
+                        <div id="flowVisualization" class="rounded">
+                            <div class="flow-container" id="flowDiagram"></div>
+                            <div class="chart-container">
+                                <canvas id="waypointChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const waypointsInput = document.getElementById('waypointsInput');
+        const optimizeBtn = document.getElementById('optimizeBtn');
+        const generateSampleBtn = document.getElementById('generateSample');
+        const errorMessage = document.getElementById('errorMessage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultContainer = document.getElementById('resultContainer');
+        const pathDisplay = document.getElementById('pathDisplay');
+        const costDisplay = document.getElementById('costDisplay');
+        const flowDiagram = document.getElementById('flowDiagram');
+        let chartInstance = null;
+
+        // Check if Chart.js is loaded
+        function isChartJsLoaded() {
+            return typeof Chart !== 'undefined';
+        }
+        
+        // Event listeners
+        optimizeBtn.addEventListener('click', async () => {
+            const waypointsText = waypointsInput.value.trim();
+            
+            // Validate input
+            if (!waypointsText) {
+                showError("Please enter waypoint data");
+                return;
+            }
+            
+            // Show loading state
+            errorMessage.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+            
+            try {
+                // Send request to backend
+                const response = await fetch('/api/optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ waypoints: waypointsText }),
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to optimize waypoints');
+                }
+                
+                // Display results
+                pathDisplay.textContent = data.path.join(' → ');
+                costDisplay.textContent = `${data.cost} units`;
+                
+                // Create flow diagram visualization
+                createFlowDiagram(data.waypoints, data.path);
+                
+                // Create 2D chart for visualization
+                if (isChartJsLoaded()) {
+                    createWaypointChart(data.waypoints, data.path);
+                } else {
+                    console.error("Chart.js not loaded");
+                    showError("Chart.js library not loaded. Flow diagram is displayed but chart visualization is unavailable.");
+                }
+                
+                // Show results
+                loadingIndicator.classList.add('hidden');
+                resultContainer.classList.remove('hidden');
+                
+            } catch (error) {
+                showError(error.message);
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+        
+        generateSampleBtn.addEventListener('click', () => {
+            waypointsInput.value = `A 0.0 0.0 0.0
+B 5.0 2.0 3.0
+C 2.5 6.0 1.0
+D 8.0 3.0 7.0
+E 4.0 5.0 4.0
+F 9.0 1.0 2.0
+G 3.0 8.0 6.0
+H 7.0 4.0 3.0`;
+        });
+        
+        // Create a flow diagram with waypoint nodes and arrows
+        function createFlowDiagram(waypoints, pathIds) {
+            // Clear existing diagram
+            flowDiagram.innerHTML = '';
+            
+            // Create waypoint nodes with arrows
+            pathIds.forEach((waypoint, index) => {
+                const isStart = index === 0;
+                const isEnd = index === pathIds.length - 1;
+                
+                // Create waypoint node
+                const node = document.createElement('div');
+                node.className = `waypoint-node ${isStart ? 'start-node' : ''} ${isEnd ? 'end-node' : ''}`;
+                node.textContent = waypoint;
+                
+                // Get waypoint coordinates
+                const waypointData = waypoints.find(w => w[0] === waypoint);
+                if (waypointData) {
+                    const [id, x, y, z] = waypointData;
+                    
+                    // Add waypoint info
+                    const info = document.createElement('div');
+                    info.className = 'waypoint-info';
+                    info.textContent = `(${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)})`;
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.style.display = 'inline-block';
+                    wrapper.style.margin = '0 5px';
+                    wrapper.appendChild(node);
+                    wrapper.appendChild(info);
+                    
+                    flowDiagram.appendChild(wrapper);
+                }
+                
+                // Add arrow if not the last waypoint
+                if (index < pathIds.length - 1) {
+                    const arrow = document.createElement('div');
+                    arrow.className = 'arrow';
+                    arrow.innerHTML = '→';
+                    flowDiagram.appendChild(arrow);
+                }
+            });
+        }
+        
+        // Create a 2D chart for visualizing waypoints
+        function createWaypointChart(waypoints, pathIds) {
+            const canvas = document.getElementById('waypointChart');
+            
+            // Destroy existing chart if it exists
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            
+            try {
+                // Extract waypoint data
+                const pathData = pathIds.map(id => {
+                    const waypoint = waypoints.find(w => w[0] === id);
+                    return {
+                        id,
+                        x: waypoint[1],
+                        y: waypoint[2],
+                    };
+                });
+                
+                // Create datasets for scatter plot
+                const datasets = [
+                    {
+                        type: 'scatter',
+                        label: 'Waypoints',
+                        data: pathData.map(point => ({ x: point.x, y: point.y })),
+                        backgroundColor: pathData.map((_, i) => {
+                            if (i === 0) return '#10b981'; // Start
+                            if (i === pathData.length - 1) return '#f43f5e'; // End
+                            return '#3b82f6'; // Middle points
+                        }),
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        pointRadius: 8,
+                        pointHoverRadius: 10,
+                    },
+                    {
+                        type: 'line',
+                        label: 'Path',
+                        data: pathData.map(point => ({ x: point.x, y: point.y })),
+                        fill: false,
+                        borderColor: '#64748b',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        pointRadius: 0,
+                    }
+                ];
+                
+                // Create chart
+                chartInstance = new Chart(canvas, {
+                    data: {
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const point = pathData[context.dataIndex];
+                                        return `${point.id} (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {
+                                    display: true,
+                                    text: 'X Coordinate'
+                                }
+                            },
+                            y: {
+                                type: 'linear',
+                                title: {
+                                    display: true,
+                                    text: 'Y Coordinate'
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error creating chart:", error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'text-red-500 text-center p-4';
+                errorDiv.textContent = 'Could not create chart visualization';
+                canvas.parentNode.replaceChild(errorDiv, canvas);
+            }
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
